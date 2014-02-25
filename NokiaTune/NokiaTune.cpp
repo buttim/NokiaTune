@@ -33,36 +33,20 @@ int duration[]={
 IRMP_DATA irmp_data;
 int tempo;
 
-void timer1_init(void) {
-	#if defined (__AVR_ATtiny45__) || defined (__AVR_ATtiny85__)                // ATtiny45 / ATtiny85:
-
-	#if F_CPU >= 16000000L
-	OCR1C   =  (F_CPU / F_INTERRUPTS / 8) - 1;                              // compare value: 1/15000 of CPU frequency, presc = 8
-	TCCR1   = (1 << CTC1) | (1 << CS12);                                    // switch CTC Mode on, set prescaler to 8
-	#else
-	OCR1C   =  (F_CPU / F_INTERRUPTS / 4) - 1;                              // compare value: 1/15000 of CPU frequency, presc = 4
-	TCCR1   = (1 << CTC1) | (1 << CS11) | (1 << CS10);                      // switch CTC Mode on, set prescaler to 4
-	#endif
-
-	#else                                                                       // ATmegaXX:
-	OCR1A   =  (F_CPU / F_INTERRUPTS) - 1;                                  // compare value: 1/15000 of CPU frequency
-	TCCR1B  = (1 << WGM12) | (1 << CS10);                                   // switch CTC Mode on, set prescaler to 1
-	#endif
-
-	#ifdef TIMSK1
-	TIMSK1  = 1 << OCIE1A;                                                  // OCIE1A: Interrupt by timer compare
-	#else
-	TIMSK   = 1 << OCIE1A;                                                  // OCIE1A: Interrupt by timer compare
-	#endif
+void timer0_init(void) {
+	OCR0A=(F_CPU / F_INTERRUPTS / 8) - 1;
+	TCCR0B|=_BV(CS01);
+	TCCR0A|=_BV(WGM01);
+	TIMSK|=_BV(OCIE0A);
 }
 
-ISR(COMPA_VECT) {
+ISR(TIMER0_COMPA_vect) {
 	irmp_ISR();
 }
 
 static void SetFreq(unsigned freq) {
 	if (freq==0) {
-		timer1_init();
+		OCR1C=0;
 		return;
 	}
 
@@ -106,10 +90,10 @@ void PlayTune(int id) {
 	for (i=0;i<sizeof melody/sizeof *melody;i++) {
 		SetFreq(melody[i]);
 		for (j=0;j<duration[i]*tempo;j++)
-		_delay_ms(10);
+			_delay_ms(10);
 		SetFreq(0);
 		for (j=0;j<tempo/2;j++)
-		_delay_ms(10);
+			_delay_ms(10);
 	}
 	SetFreq(0);
 }
@@ -117,10 +101,10 @@ void PlayTune(int id) {
 int main(void) {
 	//uint8_t id=eeprom_read_byte((uint8_t*)0);
 		
-	DDRB|=_BV(DDB3)|_BV(DDB4)|_BV(DDB1);
+	DDRB|=_BV(DDB3)|_BV(DDB4)|_BV(DDB1)|_BV(DDB0);
 	
+	timer0_init();
 	irmp_init();                                                            // initialize irmp
-	timer1_init();
 	sei();
 	
 	SetFreq(220);
@@ -135,10 +119,10 @@ int main(void) {
 			UART_TX_STRING(s);
 #endif
 			if (irmp_data.flags==0 && irmp_data.command>=68 && irmp_data.command<=71) {
-				for (int i=0;i<3;i++) {
+				//for (int i=0;i<3;i++) {
 					PlayTune(irmp_data.command-68);
-					_delay_ms(2000);
-				}				
+					//_delay_ms(2000);
+				//}				
 			}				
 		}			
 	}
