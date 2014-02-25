@@ -31,18 +31,8 @@ int duration[]={
 };
 
 IRMP_DATA irmp_data;
-int tempo;
-
-void timer0_init(void) {
-	OCR0A=(F_CPU / F_INTERRUPTS / 8) - 1;
-	TCCR0B|=_BV(CS01);
-	TCCR0A|=_BV(WGM01);
-	TIMSK|=_BV(OCIE0A);
-}
-
-ISR(TIMER0_COMPA_vect) {
-	irmp_ISR();
-}
+bool playing=false;
+int tempo,nota,timeToWait,t=0,ripetizioni;
 
 static void SetFreq(unsigned freq) {
 	if (freq==0) {
@@ -56,46 +46,73 @@ static void SetFreq(unsigned freq) {
 	GTCCR|=_BV(COM1B0)|_BV(PWM1B);
 	
 	for (unsigned int i=0;i<16;i++)
-		if (freq>=F_CPU/(2UL*(1<<i)*256)) {
-			OCR1C=F_CPU/(2UL*(1<<i)*freq)-1;
-			TCCR1=_BV(CTC1)|(1+i);
-			return;
-		}
+	if (freq>=F_CPU/(2UL*(1<<i)*256)) {
+		OCR1C=F_CPU/(2UL*(1<<i)*freq)-1;
+		TCCR1=_BV(CTC1)|(1+i);
+		return;
+	}
 	TCCR1&=~(_BV(CS10)|_BV(CS11)|_BV(CS12)|_BV(CS13));
 	OCR1C=0;
 }
 
-void PlayTune(int id) {
+void timer0_init(void) {
+	OCR0A=(F_CPU / F_INTERRUPTS / 8) - 1;
+	TCCR0B|=_BV(CS01);
+	TCCR0A|=_BV(WGM01);
+	TIMSK|=_BV(OCIE0A);
+}
+
+void StopPlay() {
+	playing=false;
+	SetFreq(0);
+}
+
+ISR(TIMER0_COMPA_vect) {
+	irmp_ISR();
+	if (!playing) return;
+	if (++t==15) {
+		t=0;
+		if (--timeToWait==0)
+			if (++nota==sizeof melody/sizeof *melody) {
+				if (++ripetizioni==3)
+					StopPlay();
+				else {
+					nota=-1;
+					timeToWait=2000;
+					SetFreq(0);
+				}
+			}				
+			else {
+				SetFreq(melody[nota]);
+				timeToWait=10*tempo*duration[nota];
+			}
+	}
+}
+
+void StartPlay(int id) {
 	switch (id) {
 	case 0:	//giusto
-		tempo=9;
+		tempo=15;
 		melody[sizeof melody/sizeof *melody-1]=A5;
 		break;
 	case 1:	//stecca in basso
-	//case 0xFF:
-		tempo=9;
+		//case 0xFF:
+		tempo=15;
 		melody[sizeof melody/sizeof *melody-1]=C5;
 		break;
 	case 2:	//stecca in alto (veloce)
-		tempo=8;
+		tempo=12;
 		melody[sizeof melody/sizeof *melody-1]=D6;
 		break;
 	case 3:	//manca ultima nota (lento)
-		tempo=10;
+		tempo=20;
 		melody[sizeof melody/sizeof *melody-1]=(notes)0;
 		break;
 	}
-
-	int i,j;
-	for (i=0;i<sizeof melody/sizeof *melody;i++) {
-		SetFreq(melody[i]);
-		for (j=0;j<duration[i]*tempo;j++)
-			_delay_ms(10);
-		SetFreq(0);
-		for (j=0;j<tempo/2;j++)
-			_delay_ms(10);
-	}
-	SetFreq(0);
+	SetFreq(melody[nota=0]);
+	timeToWait=10*tempo*duration[0];
+	ripetizioni=t=0;
+	playing=true;
 }
 
 int main(void) {
@@ -118,12 +135,10 @@ int main(void) {
 			sprintf(s,"proto: %d addr: %d cmd: %d flags: %d\r\n",irmp_data.protocol,irmp_data.address,irmp_data.command,irmp_data.flags);
 			UART_TX_STRING(s);
 #endif
-			if (irmp_data.flags==0 && irmp_data.command>=68 && irmp_data.command<=71) {
-				//for (int i=0;i<3;i++) {
-					PlayTune(irmp_data.command-68);
-					//_delay_ms(2000);
-				//}				
-			}				
+			if (irmp_data.flags==0 && irmp_data.command>=68 && irmp_data.command<=71)
+				StartPlay(irmp_data.command-68);
+			else if (irmp_data.flags==0 && irmp_data.command==67) 
+				StopPlay();
 		}			
 	}
 }
