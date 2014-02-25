@@ -1,47 +1,39 @@
-#define F_CPU 8000000
+#include "NokiaTune.h"
 #include <util/delay.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
 #include <string.h>
-//#include <avr/power.h>
-extern "C" {
-	#include "irmp.h"
-};
 #include "pitches.h"
+extern "C" {
+#include "irmp.h"
+#include "serial.h"
+};
 
-#define UART_TX_PORT PORTB
-#define UART_TX_PIN PINB1
+notes melody[]={
+	//mi-re-fa#-sol#-do#-si-re-mi-si-la-do#-mi-la
+	E6,D6,FS5,GS5,
+	CS6,B5,D5,E5,	
+	B5,A5,CS5,E5,
+	A5
+  /* scala diatonica
+  	G6,F6,A5,B5,
+	E6,D6,F5,G5,
+	D6,C6,E5,G5, 
+	C6*/
+};
 
-#define baud 9700
-#define bit_delay (1000000/baud)
+int duration[]={
+	1,1,2,2,
+	1,1,2,2,
+	1,1,2,2,
+	6
+};
 
-//write out a byte as software emulated Uart
-void serialWrite(uint8_t bite){
-	UART_TX_PORT&=~_BV(UART_TX_PIN);  //signal start bit
-	_delay_us(bit_delay);
+IRMP_DATA irmp_data;
+int tempo;
 
-	for (uint8_t mask = 0x01; mask; mask <<= 1) {
-		if (bite & mask) // choose bit
-		UART_TX_PORT|=_BV(UART_TX_PIN);
-		else
-		UART_TX_PORT&=~_BV(UART_TX_PIN);
-		_delay_us(bit_delay);
-	}
-
-	UART_TX_PORT|=_BV(UART_TX_PIN); //signal end bit
-	_delay_us(bit_delay);
-}
-
-void UART_TX_STRING(char *s) {
-	cli();
-	while (*s) serialWrite((uint8_t)*(s++));
-	sei();
-}
-
-
-
-void timer1_init (void) {
+void timer1_init(void) {
 	#if defined (__AVR_ATtiny45__) || defined (__AVR_ATtiny85__)                // ATtiny45 / ATtiny85:
 
 	#if F_CPU >= 16000000L
@@ -64,16 +56,8 @@ void timer1_init (void) {
 	#endif
 }
 
-#ifdef TIM1_COMPA_vect                                                      // ATtiny84
-#define COMPA_VECT  TIM1_COMPA_vect
-#else
-#define COMPA_VECT  TIMER1_COMPA_vect                                       // ATmega
-#endif
-
-ISR(COMPA_VECT)                                                             // Timer1 output compare A interrupt service routine, called every 1/15000 sec
-{
-	(void) irmp_ISR();                                                        // call irmp ISR
-	// call other timer interrupt routines...
+ISR(COMPA_VECT) {
+	irmp_ISR();
 }
 
 static void SetFreq(unsigned freq) {
@@ -96,28 +80,6 @@ static void SetFreq(unsigned freq) {
 	TCCR1&=~(_BV(CS10)|_BV(CS11)|_BV(CS12)|_BV(CS13));
 	OCR1C=0;
 }
-
-notes melody[] = {
-	//mi-re-fa#-sol#-do#-si-re-mi-si-la-do#-mi-la
-	E6,D6,FS5,GS5,
-	CS6,B5,D5,E5,	
-	B5,A5,CS5,E5,
-	A5
-  /*	G6,F6,A5,B5,
-	E6,D6,F5,G5,
-	D6,C6,E5,G5, 
-	C6*/
-};
-
-int duration[]= {
-	1,1,2,2,
-	1,1,2,2,
-	1,1,2,2,
-	6
-};
-
-IRMP_DATA irmp_data;
-int tempo;
 
 void PlayTune(int id) {
 	switch (id) {
@@ -176,10 +138,4 @@ int main(void) {
 				PlayTune(irmp_data.command-68);
 		}			
 	}
-
-	/*_delay_ms(500);
-	while (1) { 
-		PlayTune();
-		_delay_ms(3000);
-	}*/
 }

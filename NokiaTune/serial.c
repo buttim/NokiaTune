@@ -5,7 +5,7 @@
 #include "serial.h"
 
 //write out a byte as software emulated Uart
-void serialWrite(uint8_t bite){
+static void serialWrite(uint8_t bite) {
 	UART_TX_PORT&=~_BV(UART_TX_PIN);  //signal start bit
 	_delay_us(bit_delay);
 
