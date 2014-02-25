@@ -90,11 +90,11 @@ void PlayTune(int id) {
 	case 1:	//stecca in basso
 	//case 0xFF:
 		tempo=9;
-		melody[sizeof melody/sizeof *melody-1]=A3;
+		melody[sizeof melody/sizeof *melody-1]=C5;
 		break;
 	case 2:	//stecca in alto (veloce)
 		tempo=8;
-		melody[sizeof melody/sizeof *melody-1]=A6;
+		melody[sizeof melody/sizeof *melody-1]=D6;
 		break;
 	case 3:	//manca ultima nota (lento)
 		tempo=10;
@@ -134,8 +134,12 @@ int main(void) {
 			sprintf(s,"proto: %d addr: %d cmd: %d flags: %d\r\n",irmp_data.protocol,irmp_data.address,irmp_data.command,irmp_data.flags);
 			UART_TX_STRING(s);
 #endif
-			if (irmp_data.flags==0 && irmp_data.command>=68 && irmp_data.command<=71)
-				PlayTune(irmp_data.command-68);
+			if (irmp_data.flags==0 && irmp_data.command>=68 && irmp_data.command<=71) {
+				for (int i=0;i<3;i++) {
+					PlayTune(irmp_data.command-68);
+					_delay_ms(2000);
+				}				
+			}				
 		}			
 	}
 }
