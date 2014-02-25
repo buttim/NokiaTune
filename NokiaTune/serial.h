@@ -1,5 +1,5 @@
 #define UART_TX_PORT PORTB
-#define UART_TX_PIN PINB1
+#define UART_TX_PIN PINB0
 
 #define baud 9700
 #define bit_delay (1000000/baud)
