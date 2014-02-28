@@ -121,20 +121,21 @@ int main(void) {
 #ifdef DEBUG
 	DDRB|=_BV(DDB0);	//seriale
 #endif
-	PORTB|=_BV(PB1);	//pullup per ponticello configurazione
+	PORTB|=_BV(PB0)|_BV(PB2);	//pullup per ponticelli configurazione
 	
 	timer0_init();
 	timer1_init();
-	irmp_init();                                                            // initialize irmp
-	sei();
-	
+	irmp_init();
+	sei();	
 
 	if ((PINB&_BV(PB0))==0)
-		deviceId=0;
-	else
 		deviceId=1;
+	else if ((PINB&_BV(PB2))==0)
+		deviceId=2;
+	else
+		deviceId=3;
 
-	for (int i=0;i<=deviceId;i++) {
+	for (int i=0;i<deviceId;i++) {
 		SetFreq(220);
 		_delay_ms(40);
 		SetFreq(0);
@@ -149,13 +150,17 @@ int main(void) {
 			UART_TX_STRING(s);
 #endif
 			if (irmp_data.flags==0) {
-				if ((deviceId==0 && (irmp_data.command==69 || irmp_data.command==71)) ||
-						(deviceId==1 && (irmp_data.command==70 || irmp_data.command==68))) {
+				if (deviceId==2 && (irmp_data.command==69 || irmp_data.command==71) ||
+						deviceId==1 && irmp_data.command==70 ||
+						irmp_data.command==68 ||
+						deviceId==3 && irmp_data.command!=67) {
+					if (irmp_data.command==68 && deviceId==1)
+						_delay_ms(900);
 					StartPlay(irmp_data.command-68);
 				}
-			else if (irmp_data.flags==0 && irmp_data.command==67) 
-				StopPlay();
-			}				
+				else if (irmp_data.flags==0 && irmp_data.command==67) 
+					StopPlay();			
+			}
 		}			
 	}
 }
